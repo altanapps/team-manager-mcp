@@ -100,7 +100,7 @@ export async function fetchVendorSources(sources: SourceRef[]): Promise<FetchedS
           signal: controller.signal,
           cache: "no-store",
           headers: {
-            "user-agent": "BoardRoom-Hackathon-Demo/1.0"
+            "user-agent": "TeamManager-MCP-Hackathon-Demo/1.0"
           }
         });
         const html = await response.text();

@@ -1,10 +1,11 @@
 import { resetDemoState } from "../lib/demo-store";
-import { advanceDemo, ingestLiveSources, spawnBoardRoom } from "../lib/demo-engine";
+import { advanceDemo, ingestLiveSources, spawnTeamRoom } from "../lib/demo-engine";
+import { approveGovernancePlan, buildGovernancePlan, governancePlanWrites } from "../lib/governance-plan";
 import { applyMongoWrites, closeMongoClient, resetMongoDemo } from "../lib/mongo";
 
 async function applyStep(label: string, state: ReturnType<typeof resetDemoState>) {
   if (label === "spawn") {
-    const spawnResult = spawnBoardRoom(state);
+    const spawnResult = spawnTeamRoom(state);
     const ingestResult = await ingestLiveSources(spawnResult.state);
     await applyMongoWrites(ingestResult.state, [...spawnResult.writes, ...ingestResult.writes]);
     return ingestResult.state;
@@ -18,6 +19,22 @@ async function applyStep(label: string, state: ReturnType<typeof resetDemoState>
 async function main() {
   let state = resetDemoState();
   await resetMongoDemo(state);
+  const plan = buildGovernancePlan({
+    runId: state.runId,
+    request: state.taskPrompt,
+    vendor: state.vendor,
+    taskType: state.taskType,
+    candidates: state.candidates,
+    totalTokenBudget: state.budget.total
+  });
+  state.governancePlan = plan;
+  await applyMongoWrites(state, governancePlanWrites(plan));
+  const approved = approveGovernancePlan(plan, {
+    approved: true,
+    userNotes: "Seed replay approved with default Team Manager plan."
+  });
+  state.governancePlan = approved.plan;
+  await applyMongoWrites(state, approved.writes);
   state = await applyStep("spawn", state);
 
   for (let index = 0; index < 7; index += 1) {

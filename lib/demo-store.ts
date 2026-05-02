@@ -3,23 +3,23 @@ import { createInitialState } from "./demo-engine";
 
 declare global {
   // eslint-disable-next-line no-var
-  var __boardroom_state: DemoState | undefined;
+  var __team_manager_state: DemoState | undefined;
 }
 
 export function getDemoState(): DemoState {
-  if (!globalThis.__boardroom_state) {
-    globalThis.__boardroom_state = createInitialState();
+  if (!globalThis.__team_manager_state) {
+    globalThis.__team_manager_state = createInitialState();
   }
 
-  return globalThis.__boardroom_state;
+  return globalThis.__team_manager_state;
 }
 
 export function setDemoState(state: DemoState): DemoState {
-  globalThis.__boardroom_state = state;
+  globalThis.__team_manager_state = state;
   return state;
 }
 
 export function resetDemoState(): DemoState {
-  globalThis.__boardroom_state = createInitialState();
-  return globalThis.__boardroom_state;
+  globalThis.__team_manager_state = createInitialState();
+  return globalThis.__team_manager_state;
 }

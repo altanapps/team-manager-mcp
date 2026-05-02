@@ -1,7 +1,8 @@
-import { advanceDemo, ingestLiveSources, spawnBoardRoom } from "../lib/demo-engine";
+import { advanceDemo, ingestLiveSources, spawnTeamRoom } from "../lib/demo-engine";
 import { resetDemoState } from "../lib/demo-store";
+import { approveGovernancePlan, buildGovernancePlan, governancePlanWrites } from "../lib/governance-plan";
 import { applyMongoWrites, closeMongoClient, resetMongoDemo } from "../lib/mongo";
-import type { AgentProfile, DemoState, MongoWrite } from "../lib/types";
+import type { AgentProfile, DemoState, GovernancePlan, MongoWrite } from "../lib/types";
 
 const request =
   process.argv.slice(2).join(" ") ||
@@ -85,20 +86,58 @@ async function apply(state: DemoState, writes: MongoWrite[]) {
   return state;
 }
 
+function printPlan(plan: GovernancePlan) {
+  line("manager", `proposed plan=${plan.id} status=${plan.status}`);
+  line("measure", "25% relevance + 35% history + 10% recency + 15% latency + 15% token efficiency");
+  line(
+    "thresholds",
+    `${Math.round(plan.budgetPolicy.warningAt * 100)}% warn; ${Math.round(plan.budgetPolicy.summarizeAt * 100)}% summarize; ${Math.round(plan.budgetPolicy.hardStopAt * 100)}% ${plan.budgetPolicy.hardStopAction}`
+  );
+  line("manager model", `${plan.teamManager.model.model} temp=${plan.teamManager.model.temperature}: ${short(plan.teamManager.model.reason, 108)}`);
+  plan.teamManager.questionsForUser.forEach((question, index) => {
+    line(`question ${index + 1}`, short(question, 144));
+  });
+  plan.agents.forEach((agent) => {
+    line(
+      `plan ${agent.name}`,
+      `${agent.priority}; cap=${agent.tokenBudget.toLocaleString()} tokens; model=${agent.model.model}; memory=${agent.memoryScopes.join("/")}`
+    );
+  });
+}
+
 async function main() {
   let state = resetDemoState();
   state.taskPrompt = request;
   await resetMongoDemo(state);
 
-  console.log("\nBoardRoom MCP Harness");
-  console.log("=====================");
+  console.log("\nTeam Manager MCP Harness");
+  console.log("========================");
   line("request", request);
-  line("governance", "budget=50,000 tokens; action@70%=warn; action@90%=summarize; action@100%=abort");
+
+  const plan = buildGovernancePlan({
+    runId: state.runId,
+    request,
+    vendor: state.vendor,
+    taskType: state.taskType,
+    candidates: state.candidates,
+    totalTokenBudget: 50_000
+  });
+  state.governancePlan = plan;
+  state = await apply(state, governancePlanWrites(plan));
+  printPlan(plan);
+
+  const approved = approveGovernancePlan(plan, {
+    approved: true,
+    userNotes: "Approved for demo: prioritize caution, source-linked claims, and visible token governance."
+  });
+  state.governancePlan = approved.plan;
+  state.budget.total = approved.plan.totalTokenBudget;
+  state = await apply(state, approved.writes);
+  line("approval", `${approved.plan.status}; notes="${approved.plan.userNotes}"`);
   line("memory", "private owner-only; team room-visible; global org-visible; promotion=reused_by_3_agents");
   line("context", "blackboard topK=5; source snippets are live-fetched; checkpoint after every agent step");
-  line("dispatch", "0.25 prompt + 0.35 history + 0.10 recency + 0.15 latency + 0.15 token-efficiency");
 
-  const spawn = spawnBoardRoom(state);
+  const spawn = spawnTeamRoom(state);
   const ingest = await ingestLiveSources(spawn.state);
   state = await apply(ingest.state, [...spawn.writes, ...ingest.writes]);
   line("room", `${state.taskId} in ${state.mongo.mode === "atlas" ? "MongoDB Atlas" : "local replay"} db=${state.mongo.dbName}`);

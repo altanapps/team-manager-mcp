@@ -29,9 +29,9 @@ export function createInitialState(): DemoState {
   return {
     runId,
     taskId: `${runId}-task-vendor-eval`,
-    groupId: `${runId}-group-boardroom`,
+    groupId: `${runId}-group-team-manager`,
     teamId: "team-procurement",
-    vendor: process.env.NEXT_PUBLIC_DEMO_VENDOR ?? "PostHog",
+    vendor: process.env.TEAM_MANAGER_VENDOR ?? process.env.NEXT_PUBLIC_DEMO_VENDOR ?? "PostHog",
     taskType: "vendor_evaluation",
     taskPrompt: TASK_PROMPT,
     status: "idle",
@@ -68,7 +68,7 @@ export function createInitialState(): DemoState {
     sources: VENDOR_SOURCES.map((source) => ({ ...source, status: "pending" })),
     mongo: {
       mode: "unknown",
-      dbName: process.env.BOARDROOM_DB ?? "boardroom"
+      dbName: process.env.TEAM_MANAGER_DB ?? process.env.BOARDROOM_DB ?? "team_manager"
     }
   };
 }
@@ -468,9 +468,13 @@ export async function ingestLiveSources(state: DemoState): Promise<{ state: Demo
   return { state: working, writes };
 }
 
-export function spawnBoardRoom(state: DemoState): { state: DemoState; writes: MongoWrite[] } {
+export function spawnTeamRoom(state: DemoState): { state: DemoState; writes: MongoWrite[] } {
   const working = structuredClone(state) as DemoState;
   const writes: MongoWrite[] = [];
+  if (working.governancePlan?.status === "approved") {
+    working.budget.total = working.governancePlan.totalTokenBudget;
+    working.budget.actionAt100 = working.governancePlan.budgetPolicy.hardStopAction;
+  }
   const ranked = scoreAgents(working.taskPrompt, working.taskType, working.candidates);
   const selectedIds = new Set(ranked.slice(0, 5).map((agent) => agent.agentId));
 
@@ -522,6 +526,8 @@ export function spawnBoardRoom(state: DemoState): { state: DemoState; writes: Mo
       status: working.status,
       token_budget: working.budget.total,
       tokens_consumed: working.budget.consumed,
+      governance_plan_id: working.governancePlan?.id,
+      agent_token_budgets: Object.fromEntries((working.governancePlan?.agents ?? []).map((agent) => [agent.agentId, agent.tokenBudget])),
       group_id: working.groupId,
       agents_assigned: working.selectedAgents.map((agent) => agent.agentId),
       checkpoint: null,
@@ -538,6 +544,9 @@ export function spawnBoardRoom(state: DemoState): { state: DemoState; writes: Mo
       team_id: working.teamId,
       total_token_budget: working.budget.total,
       tokens_consumed: working.budget.consumed,
+      governance_plan_id: working.governancePlan?.id,
+      manager_reserve: working.governancePlan?.budgetPolicy.managerReserve,
+      summarizer_reserve: working.governancePlan?.budgetPolicy.summarizerReserve,
       members: working.selectedAgents.map((agent) => agent.agentId),
       created_at: new Date()
     }
@@ -565,7 +574,7 @@ export function advanceDemo(state: DemoState): { state: DemoState; writes: Mongo
   const writes: MongoWrite[] = [];
 
   if (working.selectedAgents.length === 0) {
-    return spawnBoardRoom(working);
+    return spawnTeamRoom(working);
   }
 
   working.step += 1;
@@ -684,7 +693,7 @@ export function advanceDemo(state: DemoState): { state: DemoState; writes: Mongo
     );
     voice(working, "Token budget at 70 percent. Warning injected into all specialist agents.");
     checkpoint(working, integration, 3, "checkpoint", "Integration evidence posted; waiting on legal gate.", writes);
-    timeline(working, "L4", "70 percent budget warning", "The group budget crossed 70 percent; BoardRoom injected a warning into every next context.", writes);
+    timeline(working, "L4", "70 percent budget warning", "The group budget crossed 70 percent; Team Manager injected a warning into every next context.", writes);
   }
 
   if (working.step === 4) {

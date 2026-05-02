@@ -186,6 +186,75 @@ export interface BudgetState {
   actionAt100: "warn" | "pause" | "abort";
 }
 
+export type PlanStatus = "proposed" | "approved" | "revisions_requested";
+
+export interface ModelProfile {
+  provider: "host" | "fireworks" | "claude" | "configurable";
+  model: string;
+  temperature: number;
+  maxOutputTokens: number;
+  reason: string;
+}
+
+export interface PlannedAgent {
+  agentId: string;
+  name: string;
+  role: string;
+  priority: "critical" | "high" | "medium";
+  tokenBudget: number;
+  model: ModelProfile;
+  memoryScopes: Visibility[];
+  blackboardTopK: number;
+  responsibilities: string[];
+  successCriteria: string[];
+}
+
+export interface GovernancePlan {
+  id: string;
+  status: PlanStatus;
+  request: string;
+  vendor: string;
+  taskType: string;
+  totalTokenBudget: number;
+  dispatchWeights: {
+    promptRelevance: number;
+    historicalSuccess: number;
+    recency: number;
+    latency: number;
+    tokenEfficiency: number;
+  };
+  budgetPolicy: {
+    warningAt: number;
+    summarizeAt: number;
+    hardStopAt: number;
+    hardStopAction: BudgetState["actionAt100"];
+    managerReserve: number;
+    summarizerReserve: number;
+  };
+  memoryPolicy: {
+    visibility: Visibility[];
+    defaultVisibility: Visibility;
+    promotionRule: string;
+    sensitiveDataRule: string;
+  };
+  retrievalPolicy: {
+    blackboardTopK: number;
+    memoryTopK: number;
+    sourceTopK: number;
+    requireSourceLinkedClaims: boolean;
+  };
+  teamManager: {
+    model: ModelProfile;
+    questionsForUser: string[];
+    assumptions: string[];
+  };
+  agents: PlannedAgent[];
+  priorities: string[];
+  createdAt: string;
+  approvedAt?: string;
+  userNotes?: string;
+}
+
 export interface DemoState {
   runId: string;
   taskId: string;
@@ -210,6 +279,7 @@ export interface DemoState {
   voiceEvents: VoiceEvent[];
   mongoDocs: MongoDocEvent[];
   sources: SourceRef[];
+  governancePlan?: GovernancePlan;
   finalDecision?: {
     verdict: string;
     confidence: number;

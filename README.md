@@ -1,29 +1,37 @@
-# BoardRoom
+# Team Manager MCP
 
-MongoDB-native MCP control plane for governed multi-agent workflows.
+MongoDB-native team manager for multi-agent collaboration.
 
-**Tagline:** Five agents. One budget. One blackboard. Kill any of them live and watch them resume.
+**Tagline:** Tell it the job. It proposes the team, budgets, memory rules, and models. Approve the plan, then kill any agent and watch it resume from MongoDB.
 
-BoardRoom is an MCP control plane. It exposes governance tools that any MCP-capable agent client can call while MongoDB Atlas stores the room state, evidence, blackboard, memory, checkpoints, budget, and audit trail.
+Team Manager is an MCP server for governing multi-agent work. An MCP-capable host asks it to plan a specialist room, the manager asks the human for approval or edits, and MongoDB Atlas stores the skills, assignments, shared context, memory boundaries, token budget, checkpoints, source evidence, and audit trail.
 
-BoardRoom demonstrates four primitives for production multi-agent systems:
+The live workflow evaluates PostHog as an analytics vendor for a B2B SaaS buyer. The vendor evaluation is just the workload; the product is the MongoDB-backed team manager underneath it.
 
-- Capability profiling: dispatch uses declared skills plus proven MongoDB performance history.
-- Shared blackboard: specialist agents publish source-backed findings and peers auto-subscribe.
-- Layered memory: private, team, and global memory cards with filtered Atlas Vector Search.
-- Token-budget governance: group-level budget warning at 70%, summarizer spawn at 90%, configured action at 100%.
+## Primary Theme
 
-The live workflow evaluates PostHog as an analytics vendor for a regulated B2B SaaS buyer. BoardRoom fetches public vendor pages during the run, stores extracted evidence in MongoDB, and governs a specialist agent room through MCP tools.
+Team Manager is built for **Multi-Agent Collaboration**:
 
-## Hackathon Alignment
+- **Agents convey skills:** `agent_profiles` stores declared skills plus proven performance history.
+- **Agents identify peers:** capability scoring ranks 12 candidates and proposes the best 5-agent room.
+- **Agents share context:** `blackboard_entries` is the shared room context, with vector relevance and change-stream style subscription events.
+- **Agents stay inside token limits:** `tasks` and `groups` hold the group budget, warning threshold, summarizer threshold, and hard-stop action.
+- **Agents retain scoped memory:** `memory_cards` stores private, team, and global memory with filtered retrieval.
+- **Agents survive interruptions:** `agent_performance_records` stores checkpoints and resume tokens.
 
-BoardRoom is built for the MongoDB Agentic Evolution themes:
+It also touches prolonged coordination through checkpoint/resume and adaptive retrieval through source, memory, and blackboard relevance, but the submission story should lead with multi-agent collaboration.
 
-- **Prolonged Coordination:** every agent step writes a checkpoint to MongoDB, and the demo kills and resumes `ContractRedFlags` mid-task from persisted state.
-- **Multi-Agent Collaboration:** 12 MongoDB-backed agent profiles are ranked into 5 specialists; agents publish findings to a shared blackboard and subscribe to relevant peer discoveries.
-- **Adaptive Retrieval:** blackboard and memory retrieval use vector similarity plus visibility filters so agents receive source-backed context that changes with the task and their authorization.
+## MCP Flow
 
-What was built during the hackathon: the MCP governance server, MongoDB collections/index scripts, terminal harness, demo state machine, token cascade, layered memory, blackboard, and checkpoint/resume path.
+The intended MCP sequence is collaborative:
+
+1. `team_manager_plan_room`: proposes the measurement formula, specialist roster, token allocation, model profiles, memory visibility, priorities, and user questions.
+2. `team_manager_approve_plan`: records the human's approval or revision request in MongoDB.
+3. `team_manager_start_room`: dispatches the approved room and fetches live public sources.
+4. `team_manager_advance`: advances blackboard posts, subscriptions, token cascade, memory promotion, and decision work.
+5. `team_manager_kill_agent`: simulates killing `ContractRedFlags` after checkpoint persistence.
+6. `team_manager_resume_agent`: resumes that agent from MongoDB checkpoint.
+7. `team_manager_state`: returns the current room state and audit graph.
 
 ## Quick Start
 
@@ -43,26 +51,17 @@ Example MCP server entry:
 ```json
 {
   "mcpServers": {
-    "boardroom": {
+    "team-manager": {
       "command": "/Users/advaitjayant/hackathon/team-manager/node_modules/.bin/tsx",
       "args": ["/Users/advaitjayant/hackathon/team-manager/scripts/mcp-server.ts"],
       "env": {
         "MONGODB_URI": "mongodb+srv://advait:<URL_ENCODED_PASSWORD>@cluster0.1hulng.mongodb.net/?appName=Cluster0",
-        "BOARDROOM_DB": "boardroom"
+        "TEAM_MANAGER_DB": "team_manager"
       }
     }
   }
 }
 ```
-
-Available MCP tools:
-
-- `boardroom_start_room`
-- `boardroom_advance`
-- `boardroom_kill_agent`
-- `boardroom_resume_agent`
-- `boardroom_state`
-- `boardroom_reset`
 
 Terminal demo harness:
 
@@ -78,10 +77,8 @@ Create `.env.local` locally from `.env.example` and set:
 
 ```bash
 MONGODB_URI="mongodb+srv://advait:<URL_ENCODED_PASSWORD>@cluster0.1hulng.mongodb.net/?appName=Cluster0"
-BOARDROOM_DB=boardroom
+TEAM_MANAGER_DB=team_manager
 ```
-
-The app never needs credentials committed to git.
 
 Initialize collections and indexes:
 
@@ -101,48 +98,17 @@ Seed a full replay into Atlas:
 npm run seed
 ```
 
-## Demo Run
-
-Use an MCP client or the included terminal harness. The recommended live script:
-
-```bash
-npm run harness -- "I want to due diligence PostHog as a vendor for my B2B SaaS business in the most efficient way."
-```
-
-The harness prints the governance events that an MCP client would trigger:
-
-1. Configure the room: group token budget, memory visibility, threshold actions.
-2. Dispatch the specialist board using capability profile scoring.
-3. Fetch live public vendor sources into MongoDB `source_documents`.
-4. Advance blackboard findings and vector subscriptions.
-5. Trigger 70% warning and 90% summarizer.
-6. Kill and resume `ContractRedFlags` from MongoDB checkpoint.
-7. Emit a source-linked governed output.
-
-The terminal trace deliberately shows the control-plane internals: candidate scores, context policy, source ingestion, blackboard entries, memory visibility, budget bars, checkpoints, and audit edges.
-
-## Submission Summary
-
-**Project:** BoardRoom
-
-**One-liner:** MongoDB governance for multi-agent workflows: capability dispatch, shared blackboard, layered memory, token budgets, and checkpoint recovery.
-
-**Live demo:** run `npm run mcp` from an MCP client, or use `npm run harness -- "<request>"` for the terminal walkthrough.
-
-**MongoDB use:** Atlas stores the agent registry, active tasks, group budget, blackboard, layered memory cards, checkpoints, and audit log. Atlas Vector Search powers capability matching and filtered memory retrieval.
-
-**Why it matters:** teams are moving from single agents to fleets of agents, but most demos have no durable coordination, access-controlled shared memory, or budget enforcement. BoardRoom shows that governance layer working live.
-
 ## MongoDB Collections
 
-- `agent_profiles`
-- `agent_performance_records`
-- `tasks`
-- `blackboard_entries`
-- `memory_cards`
-- `groups`
-- `audit`
-- `source_documents`
+- `governance_plans`: proposed and approved room plans, questions, model profiles, token allocations, and memory policy.
+- `agent_profiles`: candidate agent cards, skills, embeddings, and learned performance stats.
+- `agent_performance_records`: time-series execution records and checkpoints.
+- `tasks`: active work item, group assignment, token budget, and current status.
+- `groups`: room membership and group-level token consumption.
+- `blackboard_entries`: shared findings, decisions, requests, progress, and warnings.
+- `memory_cards`: private, team, and global scoped memory cards.
+- `source_documents`: live public source pages and extracted evidence snippets.
+- `audit`: append-only event and claim trail.
 
 Atlas Vector Search indexes:
 
@@ -158,6 +124,14 @@ The demo fetches these public source URLs live and stores extracted snippets in 
 - PostHog Pricing: `https://posthog.com/pricing`
 - PostHog Product OS: `https://posthog.com/`
 
-## Pitch Line
+## Submission Summary
 
-BoardRoom is not a vendor-selection chatbot or a dashboard. It is the MCP governance plane underneath real multi-agent work: capability dispatch, shared MongoDB blackboard, access-controlled memory retrieval, budget enforcement, checkpointed recovery, and source-linked auditability.
+**Project:** Team Manager MCP
+
+**One-liner:** A MongoDB-native MCP team manager that helps a user plan, budget, dispatch, coordinate, and audit specialist agents.
+
+**Live demo:** run `npm run mcp` from an MCP client, or use `npm run harness -- "<request>"` for the terminal walkthrough.
+
+**MongoDB use:** Atlas organizes and oversees the collaboration: agent skills, room plan, task assignment, shared blackboard, scoped memory, group budget, checkpoints, source evidence, and audit.
+
+**Pitch line:** This is not a vendor-selection chatbot or a dashboard. It is the MongoDB-native team manager that turns a vague task into an approved multi-agent room with explicit skills, budgets, priorities, memory boundaries, shared context, and recoverable execution.

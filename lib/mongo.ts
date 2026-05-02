@@ -1,15 +1,15 @@
 import { MongoClient, type Db } from "mongodb";
 import type { DemoState, MongoWrite } from "./types";
 
-const DEMO_SCOPE = "boardroom-demo";
+const DEMO_SCOPE = "team-manager-demo";
 
 declare global {
   // eslint-disable-next-line no-var
-  var __boardroom_mongo_client: Promise<MongoClient> | undefined;
+  var __team_manager_mongo_client: Promise<MongoClient> | undefined;
 }
 
 export function mongoDbName(): string {
-  return process.env.BOARDROOM_DB ?? "boardroom";
+  return process.env.TEAM_MANAGER_DB ?? process.env.BOARDROOM_DB ?? "team_manager";
 }
 
 export async function getMongoDb(): Promise<Db | null> {
@@ -18,22 +18,22 @@ export async function getMongoDb(): Promise<Db | null> {
     return null;
   }
 
-  if (!globalThis.__boardroom_mongo_client) {
-    globalThis.__boardroom_mongo_client = new MongoClient(uri).connect();
+  if (!globalThis.__team_manager_mongo_client) {
+    globalThis.__team_manager_mongo_client = new MongoClient(uri).connect();
   }
 
-  const client = await globalThis.__boardroom_mongo_client;
+  const client = await globalThis.__team_manager_mongo_client;
   return client.db(mongoDbName());
 }
 
 export async function closeMongoClient(): Promise<void> {
-  if (!globalThis.__boardroom_mongo_client) {
+  if (!globalThis.__team_manager_mongo_client) {
     return;
   }
 
-  const client = await globalThis.__boardroom_mongo_client;
+  const client = await globalThis.__team_manager_mongo_client;
   await client.close();
-  globalThis.__boardroom_mongo_client = undefined;
+  globalThis.__team_manager_mongo_client = undefined;
 }
 
 async function collectionExists(db: Db, name: string): Promise<boolean> {
@@ -57,7 +57,16 @@ export async function ensureCoreCollectionsAndIndexes(): Promise<void> {
     });
   }
 
-  const collectionNames = ["agent_profiles", "tasks", "blackboard_entries", "memory_cards", "groups", "audit", "source_documents"];
+  const collectionNames = [
+    "agent_profiles",
+    "tasks",
+    "blackboard_entries",
+    "memory_cards",
+    "groups",
+    "audit",
+    "source_documents",
+    "governance_plans"
+  ];
   for (const name of collectionNames) {
     if (!(await collectionExists(db, name))) {
       await db.createCollection(name);
@@ -73,6 +82,8 @@ export async function ensureCoreCollectionsAndIndexes(): Promise<void> {
     db.collection("memory_cards").createIndex({ visibility: 1, owner_agent_id: 1, team_id: 1 }),
     db.collection("source_documents").createIndex({ task_id: 1, source_id: 1 }),
     db.collection("source_documents").createIndex({ fetched_at: -1 }),
+    db.collection("governance_plans").createIndex({ plan_id: 1 }),
+    db.collection("governance_plans").createIndex({ status: 1, created_at: -1 }),
     db.collection("groups").createIndex({ team_id: 1 }),
     db.collection("audit").createIndex({ task_id: 1 }),
     db.collection("audit").createIndex({ demo_run_id: 1 })
@@ -163,7 +174,16 @@ export async function resetMongoDemo(state: DemoState): Promise<{ connected: boo
     }
 
     await ensureCoreCollectionsAndIndexes();
-    const collections = ["agent_profiles", "tasks", "blackboard_entries", "memory_cards", "groups", "audit", "source_documents"];
+    const collections = [
+      "agent_profiles",
+      "tasks",
+      "blackboard_entries",
+      "memory_cards",
+      "groups",
+      "audit",
+      "source_documents",
+      "governance_plans"
+    ];
     await Promise.all(collections.map((name) => db.collection(name).deleteMany({ demo_scope: DEMO_SCOPE })));
 
     state.mongo.mode = "atlas";
