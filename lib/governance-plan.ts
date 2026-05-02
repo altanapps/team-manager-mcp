@@ -9,7 +9,7 @@ const DEFAULT_WEIGHTS = {
   tokenEfficiency: 0.15
 };
 
-const TASK_COMPLEXITY_MULTIPLIER: Record<string, number> = {
+export const TASK_COMPLEXITY_MULTIPLIER: Record<string, number> = {
   crypto_market_decision: 1.3,
   legal_risk: 1.25,
   technical_decision: 1.18,
@@ -102,12 +102,12 @@ function modelForAgent(agent: AgentProfile): ModelProfile {
   return modelProfile("evidence");
 }
 
-function roughTokenCount(text: string): number {
+export function roughTokenCount(text: string): number {
   const words = text.trim().split(/\s+/).filter(Boolean).length;
   return Math.max(1, Math.ceil(words * 1.35));
 }
 
-function requestComplexityScore(request: string, taskType: string): number {
+export function requestComplexityScore(request: string, taskType: string): number {
   const lower = request.toLowerCase();
   const riskSignals = [
     "regulatory",
@@ -130,15 +130,15 @@ function requestComplexityScore(request: string, taskType: string): number {
   return (1 + lengthComponent + riskSignals * 0.14) * taskMultiplier;
 }
 
-function selectedAgentHistoricalTokens(taskType: string, agents: AgentProfile[]): number {
+export function selectedAgentHistoricalTokens(taskType: string, agents: AgentProfile[]): number {
   return agents.reduce((sum, agent) => sum + historicalTokensForAgent(agent, taskType), 0) || 24_000;
 }
 
-function coordinationOverheadTokens(request: string, agents: AgentProfile[]): number {
+export function coordinationOverheadTokens(request: string, agents: AgentProfile[]): number {
   return Math.round((agents.length + 1) * roughTokenCount(request) * 16);
 }
 
-function estimateTotalTokenBudget(request: string, taskType: string, agents: AgentProfile[]): number {
+export function estimateTotalTokenBudget(request: string, taskType: string, agents: AgentProfile[]): number {
   const complexity = requestComplexityScore(request, taskType);
   const historicalNeed = selectedAgentHistoricalTokens(taskType, agents);
   const coordinationOverhead = coordinationOverheadTokens(request, agents);
@@ -146,7 +146,7 @@ function estimateTotalTokenBudget(request: string, taskType: string, agents: Age
   return Math.min(120_000, Math.max(22_000, estimate));
 }
 
-function reserveRatio(taskType: string, request: string): number {
+export function reserveRatio(taskType: string, request: string): number {
   const complexity = requestComplexityScore(request, taskType);
   if (complexity >= 2.2) {
     return 0.18;
@@ -157,12 +157,12 @@ function reserveRatio(taskType: string, request: string): number {
   return 0.14;
 }
 
-function historicalTokensForAgent(agent: AgentProfile, taskType: string): number {
+export function historicalTokensForAgent(agent: AgentProfile, taskType: string): number {
   const proven = agent.provenSkills[taskType] ?? agent.provenSkills.general_decision;
   return proven?.avgTokens ?? Math.round(agent.avgDurationMs / 4);
 }
 
-function budgetDemand(agent: AgentProfile, taskType: string): number {
+export function budgetDemand(agent: AgentProfile, taskType: string): number {
   const historicalTokens = historicalTokensForAgent(agent, taskType);
   const priorityLevel = priority(agent);
   const priorityMultiplier = priorityLevel === "critical" ? 1.22 : priorityLevel === "high" ? 1.08 : 1;

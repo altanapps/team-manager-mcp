@@ -13,6 +13,6 @@
     "isolatedModules": true,
     "incremental": true
   },
-  "include": ["lib/**/*.ts", "scripts/**/*.ts"],
+  "include": ["lib/**/*.ts", "scripts/**/*.ts", "tests/**/*.ts"],
   "exclude": ["node_modules"]
 }

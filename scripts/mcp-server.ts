@@ -87,6 +87,29 @@ function toolJson(value: unknown) {
   };
 }
 
+function toolError(toolName: string, error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  const stack = error instanceof Error ? error.stack : undefined;
+  logEvent("tool.error", { tool: toolName, message, stack });
+  return {
+    isError: true,
+    content: [
+      {
+        type: "text" as const,
+        text: JSON.stringify(
+          {
+            error: message,
+            tool: toolName,
+            hint: "Team Manager tool threw before completion. Check the server stderr for the stack trace, then retry or call team_manager_state to inspect current room state."
+          },
+          null,
+          2
+        )
+      }
+    ]
+  };
+}
+
 async function applyAndStore(state: DemoState, writes: MongoWrite[]) {
   await applyMongoWrites(state, writes);
   setDemoState(state);
@@ -184,6 +207,31 @@ const server = new McpServer({
   name: "team-manager",
   version: "0.1.0"
 });
+
+// Wrap every registered tool handler so unhandled throws from MongoDB,
+// Bright Data, or downstream helpers surface as MCP error responses
+// instead of crashing the stdio server.
+type AnyHandler = (...args: unknown[]) => Promise<unknown>;
+const __originalRegisterTool = server.registerTool.bind(server);
+(server as { registerTool: (...args: unknown[]) => unknown }).registerTool = (
+  name: unknown,
+  config: unknown,
+  handler: unknown
+) => {
+  const safeHandler = (async (...args: unknown[]) => {
+    try {
+      return await (handler as AnyHandler)(...args);
+    } catch (error) {
+      return toolError(String(name), error);
+    }
+  }) as AnyHandler;
+  // The MCP SDK's overloads don't model dynamic interception; cast to bypass.
+  return (__originalRegisterTool as unknown as (
+    n: unknown,
+    c: unknown,
+    h: unknown
+  ) => unknown)(name, config, safeHandler);
+};
 
 server.registerTool(
   "team_manager_plan_room",
